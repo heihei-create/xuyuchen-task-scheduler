@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: task-scheduler
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+server:
+  port: ${PORT:8081}
+scheduler:
+  dispatch-delay-ms: ${DISPATCH_DELAY_MS:1000}
+  reaper-delay-ms: ${REAPER_DELAY_MS:5000}

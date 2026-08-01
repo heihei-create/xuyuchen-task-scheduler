@@ -1,0 +1,13 @@
+services:
+  app:
+    build: .
+    ports: ["8081:8081"]
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      REDIS_HOST: redis
+    depends_on: [rabbitmq, redis]
+  redis:
+    image: redis:7-alpine
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    ports: ["5672:5672","15672:15672"]
