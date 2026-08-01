@@ -4,10 +4,11 @@ create table if not exists tasks (
   name varchar(128) not null,
   payload clob,
   idempotency_key varchar(256) not null,
-  created_at timestamp not null,
+  created_at timestamp(9) not null,
   status varchar(32) not null,
   attempt integer not null,
-  lease_until timestamp null,
+  lease_until timestamp(9) null,
+  lease_token varchar(128) null,
   worker_id varchar(128) null,
   result clob null,
   unique(tenant_id, idempotency_key)

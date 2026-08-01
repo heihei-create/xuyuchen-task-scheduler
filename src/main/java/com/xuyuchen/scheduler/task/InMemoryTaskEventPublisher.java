@@ -1,11 +1,13 @@
 package com.xuyuchen.scheduler.task;
 
 import org.springframework.stereotype.Component;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 @Component
+@ConditionalOnProperty(name = "scheduler.messaging", havingValue = "memory", matchIfMissing = true)
 public class InMemoryTaskEventPublisher implements TaskEventPublisher {
     private final CopyOnWriteArrayList<TaskEvent> events = new CopyOnWriteArrayList<>();
     @Override public void publish(TaskEvent event) { events.add(event); }
@@ -15,4 +17,5 @@ public class InMemoryTaskEventPublisher implements TaskEventPublisher {
         java.util.Collections.reverse(result);
         return result;
     }
+    public List<TaskEvent> recent(String tenantId, int limit) { return events.stream().filter(event -> event.tenantId().equals(tenantId)).sorted(java.util.Comparator.comparing(TaskEvent::occurredAt).reversed()).limit(Math.max(1, limit)).toList(); }
 }

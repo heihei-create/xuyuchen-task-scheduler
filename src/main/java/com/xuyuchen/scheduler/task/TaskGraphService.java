@@ -9,7 +9,13 @@ import java.util.concurrent.ConcurrentHashMap;
 public class TaskGraphService {
     private final Map<UUID, TaskGraph> graphs = new ConcurrentHashMap<>();
     private final DependencyRepository dependencies;
-    public TaskGraphService(DependencyRepository dependencies) { this.dependencies = dependencies; }
+    private final TaskRepository tasks;
+    public TaskGraphService(DependencyRepository dependencies, TaskRepository tasks) { this.dependencies = dependencies; this.tasks = tasks; }
+    public TaskGraph graph(String tenantId, UUID rootTaskId, List<TaskDependency> edges) {
+        if (!belongsTo(tenantId, rootTaskId)) throw new IllegalArgumentException("task not found");
+        for (TaskDependency edge : edges) if (!belongsTo(tenantId, edge.parentTaskId()) || !belongsTo(tenantId, edge.childTaskId())) throw new IllegalArgumentException("dependency task not found");
+        return graph(rootTaskId, edges);
+    }
     public TaskGraph graph(UUID rootTaskId, List<TaskDependency> edges) {
         TaskGraph graph = new TaskGraph(); graph.add(rootTaskId);
         edges.forEach(edge -> { graph.addEdge(edge.parentTaskId(), edge.childTaskId()); dependencies.save(edge); });
@@ -22,4 +28,6 @@ public class TaskGraphService {
         return graph.parentsOf(taskId).stream().allMatch(parent -> statuses.get(parent) == TaskStatus.SUCCESS);
     }
     public List<UUID> order(UUID rootTaskId) { return require(rootTaskId).topologicalOrder(); }
+    public void requireTenant(String tenantId, UUID rootTaskId) { if (!belongsTo(tenantId, rootTaskId)) throw new IllegalArgumentException("task not found"); require(rootTaskId); }
+    private boolean belongsTo(String tenantId, UUID taskId) { return tasks.findById(taskId).map(task -> task.getTenantId().equals(tenantId)).orElse(false); }
 }

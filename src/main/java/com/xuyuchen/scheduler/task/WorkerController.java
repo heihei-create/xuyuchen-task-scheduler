@@ -15,13 +15,13 @@ public class WorkerController {
     public WorkerController(WorkerRegistry registry) { this.registry = registry; }
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public WorkerResponse register(@Valid @RequestBody RegisterRequest req) {
-        return WorkerResponse.from(registry.register(req.workerId(), req.host(), req.capabilities() == null ? java.util.Set.of() : req.capabilities()));
+    public WorkerResponse register(@RequestHeader("X-Tenant-Id") String tenantId, @Valid @RequestBody RegisterRequest req) {
+        return WorkerResponse.from(registry.register(tenantId, req.workerId(), req.host(), req.capabilities() == null ? java.util.Set.of() : req.capabilities()));
     }
     @PostMapping("/{workerId}/heartbeat")
-    public WorkerResponse heartbeat(@PathVariable String workerId, @Valid @RequestBody HeartbeatRequest req) { return WorkerResponse.from(registry.heartbeat(workerId, req.runningTasks())); }
+    public WorkerResponse heartbeat(@RequestHeader("X-Tenant-Id") String tenantId, @PathVariable String workerId, @Valid @RequestBody HeartbeatRequest req) { WorkerInfo worker = registry.require(workerId); if (!worker.getTenantId().equals(tenantId)) throw new IllegalArgumentException("worker not found"); return WorkerResponse.from(registry.heartbeat(workerId, req.runningTasks())); }
     @PostMapping("/{workerId}/drain")
-    public WorkerResponse drain(@PathVariable String workerId) { registry.drain(workerId); return WorkerResponse.from(registry.require(workerId)); }
+    public WorkerResponse drain(@RequestHeader("X-Tenant-Id") String tenantId, @PathVariable String workerId) { WorkerInfo worker = registry.require(workerId); if (!worker.getTenantId().equals(tenantId)) throw new IllegalArgumentException("worker not found"); registry.drain(workerId); return WorkerResponse.from(registry.require(workerId)); }
     @GetMapping
-    public List<WorkerResponse> list() { return registry.list().stream().map(WorkerResponse::from).toList(); }
+    public List<WorkerResponse> list(@RequestHeader("X-Tenant-Id") String tenantId) { return registry.list().stream().filter(worker -> worker.getTenantId().equals(tenantId)).map(WorkerResponse::from).toList(); }
 }

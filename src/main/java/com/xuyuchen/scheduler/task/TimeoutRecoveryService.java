@@ -14,8 +14,9 @@ public class TimeoutRecoveryService {
     private final SchedulerMetrics metrics;
     private final TaskAuditService audit;
     private final TaskEventPublisher events;
-    public TimeoutRecoveryService(TaskRepository tasks, TaskLeaseService leases, TenantQuotaService quotas, SchedulerMetrics metrics, TaskAuditService audit, TaskEventPublisher events) {
-        this.tasks = tasks; this.leases = leases; this.quotas = quotas; this.metrics = metrics; this.audit = audit; this.events = events;
+    private final WorkerRegistry workers;
+    public TimeoutRecoveryService(TaskRepository tasks, TaskLeaseService leases, TenantQuotaService quotas, SchedulerMetrics metrics, TaskAuditService audit, TaskEventPublisher events, WorkerRegistry workers) {
+        this.tasks = tasks; this.leases = leases; this.quotas = quotas; this.metrics = metrics; this.audit = audit; this.events = events; this.workers = workers;
     }
     @Scheduled(fixedDelayString = "${scheduler.timeout-delay-ms:5000}")
     public void recover() {
@@ -25,7 +26,11 @@ public class TimeoutRecoveryService {
     private void recoverOne(Task task) {
         TaskStatus before = task.getStatus();
         if (!task.timeout()) return;
-        quotas.release(task.getTenantId()); metrics.timedOut();
+        tasks.save(task);
+        quotas.release(task.getTenantId());
+        if (task.getWorkerId() != null) workers.find(task.getWorkerId()).ifPresent(WorkerInfo::markTaskFinished);
+        leases.forget(task.getId());
+        metrics.timedOut();
         audit.record(task, "timeout-reaper", before, TaskStatus.TIMEOUT, "lease-expired", RequestContextFilter.traceId(), Map.of("attempt", task.getAttempt()));
         events.publish(TaskEvent.of(task, TaskEventType.TIMED_OUT, null, RequestContextFilter.traceId(), Map.of()));
     }

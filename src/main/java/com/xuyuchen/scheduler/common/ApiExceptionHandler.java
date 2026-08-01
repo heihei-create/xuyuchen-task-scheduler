@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 
 import java.time.Instant;
 
@@ -17,5 +18,17 @@ public class ApiExceptionHandler {
     @ExceptionHandler(IllegalStateException.class)
     ResponseEntity<ApiError> conflict(IllegalStateException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiError(Instant.now(), 409, ex.getMessage()));
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    ResponseEntity<ApiError> validation(MethodArgumentNotValidException ex) {
+        String message = ex.getBindingResult().getFieldErrors().stream().findFirst()
+                .map(error -> error.getField() + ": " + error.getDefaultMessage()).orElse("request validation failed");
+        return ResponseEntity.badRequest().body(new ApiError(Instant.now(), 400, message));
+    }
+
+    @ExceptionHandler(Exception.class)
+    ResponseEntity<ApiError> unexpected(Exception ex) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ApiError(Instant.now(), 500, "internal server error"));
     }
 }

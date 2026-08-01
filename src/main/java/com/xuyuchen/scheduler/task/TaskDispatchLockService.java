@@ -11,4 +11,5 @@ public class TaskDispatchLockService {
     public boolean tryTenant(String tenantId, String schedulerId) { return lock.tryAcquire("scheduler:tenant:" + tenantId, schedulerId, Duration.ofSeconds(10)); }
     public boolean releaseTenant(String tenantId, String schedulerId) { return lock.release("scheduler:tenant:" + tenantId, schedulerId); }
     public boolean tryTask(String taskId, String schedulerId) { return lock.tryAcquire("scheduler:task:" + taskId, schedulerId, Duration.ofSeconds(30)); }
+    public boolean releaseTask(String taskId, String schedulerId) { return lock.release("scheduler:task:" + taskId, schedulerId); }
 }

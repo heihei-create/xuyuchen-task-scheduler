@@ -9,7 +9,8 @@ public class TaskDAGValidator {
     private final DependencyRepository dependencies;
     public TaskDAGValidator(DependencyRepository dependencies) { this.dependencies = dependencies; }
     public void addDependency(TaskDependency dependency) {
-        if (wouldCreateCycle(dependency.parentTaskId(), dependency.childTaskId(), new HashSet<>())) throw new IllegalArgumentException("dependency would create a cycle");
+        // A new parent -> child edge is cyclic when child already reaches parent.
+        if (wouldCreateCycle(dependency.childTaskId(), dependency.parentTaskId(), new HashSet<>())) throw new IllegalArgumentException("dependency would create a cycle");
         dependencies.save(dependency);
     }
     public boolean ready(UUID taskId, Set<TaskStatus> completedStates, Map<UUID, TaskStatus> statuses) {

@@ -20,7 +20,7 @@ public class TaskCancellationService {
         if (!task.getTenantId().equals(tenantId)) throw new IllegalArgumentException("task not found");
         TaskStatus before = task.getStatus();
         if (!task.cancel()) throw new IllegalStateException("task cannot be canceled");
-        quotas.release(tenantId);
+        if (before == TaskStatus.DISPATCHED || before == TaskStatus.RUNNING) quotas.release(tenantId);
         tasks.save(task);
         audit.record(task, operator, before, TaskStatus.CANCELED, reason, RequestContextFilter.traceId(), Map.of());
         events.publish(TaskEvent.of(task, TaskEventType.CANCELED, operator, RequestContextFilter.traceId(), Map.of("reason", reason)));

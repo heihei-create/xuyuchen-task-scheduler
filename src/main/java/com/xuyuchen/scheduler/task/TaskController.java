@@ -13,19 +13,16 @@ import static com.xuyuchen.scheduler.task.TaskDtos.*;
 @RequestMapping("/api/v1/tasks")
 public class TaskController {
     private final TaskService service;
-    public TaskController(TaskService service) { this.service = service; }
+    private final TaskLifecycleService lifecycle;
+    public TaskController(TaskService service, TaskLifecycleService lifecycle) { this.service = service; this.lifecycle = lifecycle; }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public TaskResponse create(@RequestHeader("X-Tenant-Id") String tenantId, @Valid @RequestBody CreateTaskRequest req) { return TaskResponse.from(service.create(tenantId, req)); }
+    public TaskResponse create(@RequestHeader("X-Tenant-Id") String tenantId, @Valid @RequestBody CreateTaskRequest req) { return TaskResponse.from(lifecycle.create(tenantId, req.name(), req.payload(), req.idempotencyKey())); }
     @GetMapping
     public List<TaskResponse> list(@RequestHeader("X-Tenant-Id") String tenantId) { return service.list(tenantId).stream().map(TaskResponse::from).toList(); }
     @GetMapping("/{id}")
     public TaskResponse get(@RequestHeader("X-Tenant-Id") String tenantId, @PathVariable UUID id) { return TaskResponse.from(service.get(tenantId, id)); }
-    @PostMapping("/{id}/start")
-    public TaskResponse start(@RequestHeader("X-Tenant-Id") String tenantId, @PathVariable UUID id, @Valid @RequestBody WorkerEventRequest req) { return TaskResponse.from(service.start(tenantId, id, req)); }
-    @PostMapping("/{id}/finish")
-    public TaskResponse finish(@RequestHeader("X-Tenant-Id") String tenantId, @PathVariable UUID id, @Valid @RequestBody WorkerEventRequest req) { return TaskResponse.from(service.finish(tenantId, id, req)); }
     @PostMapping("/{id}/cancel")
     public TaskResponse cancel(@RequestHeader("X-Tenant-Id") String tenantId, @PathVariable UUID id) { return TaskResponse.from(service.cancel(tenantId, id)); }
 }

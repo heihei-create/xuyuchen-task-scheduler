@@ -9,7 +9,8 @@ import java.util.UUID;
 @RequestMapping("/internal/worker-commands")
 public class WorkerCommandAuditController {
     private final WorkerCommandAuditService service;
-    public WorkerCommandAuditController(WorkerCommandAuditService service) { this.service = service; }
+    private final TaskQueryService queries;
+    public WorkerCommandAuditController(WorkerCommandAuditService service, TaskQueryService queries) { this.service = service; this.queries = queries; }
     @GetMapping("/{taskId}")
-    public List<WorkerCommandAuditService.CommandAudit> list(@PathVariable UUID taskId) { return service.list(taskId); }
+    public List<WorkerCommandAuditService.CommandAudit> list(@RequestHeader("X-Tenant-Id") String tenantId, @PathVariable UUID taskId) { queries.require(tenantId, taskId); return service.list(taskId); }
 }

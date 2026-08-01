@@ -10,6 +10,10 @@ public class RabbitWorkerCommandPublisher implements WorkerCommandPublisher {
     private final RabbitTemplate rabbitTemplate;
     public RabbitWorkerCommandPublisher(RabbitTemplate rabbitTemplate) { this.rabbitTemplate = rabbitTemplate; }
     @Override public void dispatch(WorkerCommand command) {
-        rabbitTemplate.convertAndSend("scheduler.worker.commands", command.workerId(), command);
+        rabbitTemplate.convertAndSend("scheduler.worker.commands", command.workerId(), command, message -> {
+            message.getMessageProperties().setDeliveryMode(org.springframework.amqp.core.MessageDeliveryMode.PERSISTENT);
+            message.getMessageProperties().setHeader("tenantId", command.tenantId());
+            return message;
+        });
     }
 }

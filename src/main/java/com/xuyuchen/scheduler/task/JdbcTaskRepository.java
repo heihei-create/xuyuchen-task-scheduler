@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -18,7 +19,7 @@ public class JdbcTaskRepository implements TaskRepository {
     private final NamedParameterJdbcTemplate jdbc;
     public JdbcTaskRepository(NamedParameterJdbcTemplate jdbc) { this.jdbc = jdbc; }
     @Override public Task save(Task task) {
-        String sql = "merge into tasks(id,tenant_id,name,payload,idempotency_key,created_at,status,attempt,lease_until,worker_id,result) values(:id,:tenant,:name,:payload,:key,:created,:status,:attempt,:lease,:worker,:result)";
+        String sql = "merge into tasks (id,tenant_id,name,payload,idempotency_key,created_at,status,attempt,lease_until,lease_token,worker_id,result) key(id) values(:id,:tenant,:name,:payload,:key,:created,:status,:attempt,:lease,:leaseToken,:worker,:result)";
         jdbc.update(sql, params(task)); return task;
     }
     @Override public Optional<Task> findById(UUID id) {
@@ -40,12 +41,15 @@ public class JdbcTaskRepository implements TaskRepository {
     private MapSqlParameterSource params(Task t) {
         return new MapSqlParameterSource()
                 .addValue("id", t.getId().toString()).addValue("tenant", t.getTenantId()).addValue("name", t.getName())
-                .addValue("payload", t.getPayload()).addValue("key", t.getIdempotencyKey()).addValue("created", t.getCreatedAt())
-                .addValue("status", t.getStatus().name()).addValue("attempt", t.getAttempt()).addValue("lease", t.getLeaseUntil())
-                .addValue("worker", t.getWorkerId()).addValue("result", t.getResult());
+                .addValue("payload", t.getPayload()).addValue("key", t.getIdempotencyKey()).addValue("created", Timestamp.from(t.getCreatedAt()))
+                .addValue("status", t.getStatus().name()).addValue("attempt", t.getAttempt()).addValue("lease", t.getLeaseUntil() == null ? null : Timestamp.from(t.getLeaseUntil()))
+                .addValue("worker", t.getWorkerId()).addValue("result", t.getResult()).addValue("leaseToken", t.getLeaseToken());
     }
     private Task map(ResultSet rs, int row) throws SQLException {
-        Task task = new Task(UUID.fromString(rs.getString("id")), rs.getString("tenant_id"), rs.getString("name"), rs.getString("payload"), rs.getString("idempotency_key"));
-        return task;
+        Timestamp lease = rs.getTimestamp("lease_until");
+        return Task.restore(UUID.fromString(rs.getString("id")), rs.getString("tenant_id"), rs.getString("name"),
+                rs.getString("payload"), rs.getString("idempotency_key"), rs.getTimestamp("created_at").toInstant(),
+                TaskStatus.valueOf(rs.getString("status")), rs.getInt("attempt"), lease == null ? null : lease.toInstant(),
+                rs.getString("worker_id"), rs.getString("result"), rs.getString("lease_token"));
     }
 }

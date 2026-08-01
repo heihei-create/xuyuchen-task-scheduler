@@ -16,16 +16,19 @@ public class TaskLifecycleService {
     private final WorkerRegistry workers;
     private final TaskAuditService audit;
     private final TaskEventPublisher events;
+    private final DispatchOrchestrator orchestrator;
+    private final TaskPayloadValidator payloads;
 
-    public TaskLifecycleService(TaskRepository tasks, TaskTemplateService templates, TenantQuotaService quotas, WorkerRegistry workers, TaskAuditService audit, TaskEventPublisher events) {
-        this.tasks = tasks; this.templates = templates; this.quotas = quotas; this.workers = workers; this.audit = audit; this.events = events;
+    public TaskLifecycleService(TaskRepository tasks, TaskTemplateService templates, TenantQuotaService quotas, WorkerRegistry workers, TaskAuditService audit, TaskEventPublisher events, DispatchOrchestrator orchestrator, TaskPayloadValidator payloads) {
+        this.tasks = tasks; this.templates = templates; this.quotas = quotas; this.workers = workers; this.audit = audit; this.events = events; this.orchestrator = orchestrator; this.payloads = payloads;
     }
 
     public Task create(String tenantId, String templateCode, String payload, String idempotencyKey) {
         TaskTemplate template = templates.list(tenantId).stream().filter(t -> t.getCode().equals(templateCode) && t.isEnabled()).findFirst().orElseThrow(() -> new IllegalArgumentException("enabled template not found"));
-        if (!quotas.reserveSubmission(tenantId)) throw new IllegalStateException("daily tenant quota exceeded");
+        payloads.validate(template, payload);
         Task existing = tasks.findByIdempotencyKey(tenantId, idempotencyKey).orElse(null);
         if (existing != null) return existing;
+        if (!quotas.reserveSubmission(tenantId)) throw new IllegalStateException("daily tenant quota exceeded");
         Task task = new Task(UUID.randomUUID(), tenantId, template.getCode(), payload, idempotencyKey);
         task.ready(); tasks.save(task);
         audit.record(task, "api", TaskStatus.CREATED, TaskStatus.READY, "task-created", RequestContextFilter.traceId(), object("template", template.getCode()));
@@ -35,21 +38,15 @@ public class TaskLifecycleService {
 
     public Task dispatch(String tenantId, UUID taskId) {
         Task task = require(tenantId, taskId);
-        TaskTemplate template = templates.list(tenantId).stream().filter(t -> t.getCode().equals(task.getName())).findFirst().orElseThrow(() -> new IllegalStateException("template missing"));
-        WorkerInfo worker = workers.available(template.getExecutorType()).stream().findFirst().orElseThrow(() -> new IllegalStateException("no worker capability available"));
-        if (!quotas.acquire(tenantId)) throw new IllegalStateException("running quota exceeded");
-        TaskStatus before = task.getStatus();
-        if (!task.dispatch(worker.getWorkerId(), 30)) { quotas.release(tenantId); throw new IllegalStateException("task is not ready"); }
-        worker.markTaskStarted();
-        audit.record(task, "scheduler", before, TaskStatus.DISPATCHED, "worker-selected", RequestContextFilter.traceId(), object("workerId", worker.getWorkerId(), "executor", template.getExecutorType()));
-        events.publish(TaskEvent.of(task, TaskEventType.DISPATCHED, worker.getWorkerId(), RequestContextFilter.traceId(), object("executor", template.getExecutorType())));
-        return task;
+        if (!orchestrator.dispatchOne(task)) throw new IllegalStateException("task could not be dispatched");
+        return require(tenantId, taskId);
     }
 
     public Task start(String tenantId, UUID taskId, String workerId, int attempt) {
         Task task = require(tenantId, taskId);
         TaskStatus before = task.getStatus();
         if (!task.start(workerId, attempt)) throw new IllegalStateException("stale start event");
+        tasks.save(task);
         audit.record(task, workerId, before, TaskStatus.RUNNING, "worker-started", RequestContextFilter.traceId(), Map.of("attempt", attempt));
         events.publish(TaskEvent.of(task, TaskEventType.STARTED, workerId, RequestContextFilter.traceId(), Map.of()));
         return task;
@@ -59,6 +56,7 @@ public class TaskLifecycleService {
         Task task = require(tenantId, taskId);
         TaskStatus before = task.getStatus();
         if (!task.finish(workerId, attempt, success, result)) throw new IllegalStateException("stale finish event");
+        tasks.save(task);
         quotas.release(tenantId); workers.require(workerId).markTaskFinished();
         TaskStatus after = task.getStatus();
         audit.record(task, workerId, before, after, success ? "worker-success" : "worker-failed", RequestContextFilter.traceId(), object("resultSize", result == null ? 0 : result.length()));

@@ -1,6 +1,6 @@
 package com.xuyuchen.scheduler.task;
 
-import org.springframework.context.annotation.Primary;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 
 import java.util.Comparator;
@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 @Repository
-@Primary
+@ConditionalOnProperty(name = "scheduler.persistence", havingValue = "memory", matchIfMissing = true)
 public class InMemoryTaskRepository implements TaskRepository {
     private final ConcurrentMap<UUID, Task> records = new ConcurrentHashMap<>();
     @Override public Task save(Task task) { records.put(task.getId(), task); return task; }

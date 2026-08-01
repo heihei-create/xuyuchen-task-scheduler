@@ -13,7 +13,12 @@ public class WorkerRegistry {
     private final long heartbeatTimeoutSeconds = 30;
 
     public WorkerInfo register(String workerId, String host, Set<String> capabilities) {
-        WorkerInfo worker = new WorkerInfo(workerId, host, capabilities);
+        return register("default", workerId, host, capabilities);
+    }
+    public WorkerInfo register(String tenantId, String workerId, String host, Set<String> capabilities) {
+        workers.values().stream().filter(existing -> existing.getWorkerId().equals(workerId) && !existing.getTenantId().equals(tenantId)).findAny()
+                .ifPresent(existing -> { throw new IllegalStateException("worker id is already registered by another tenant"); });
+        WorkerInfo worker = new WorkerInfo(tenantId, workerId, host, capabilities);
         worker.ready(); workers.put(workerId, worker); return worker;
     }
     public WorkerInfo require(String workerId) {
@@ -21,13 +26,22 @@ public class WorkerRegistry {
         if (worker == null) throw new IllegalArgumentException("worker not found");
         return worker;
     }
+    public java.util.Optional<WorkerInfo> find(String workerId) { return java.util.Optional.ofNullable(workers.get(workerId)); }
     public WorkerInfo heartbeat(String workerId, int runningTasks) {
         WorkerInfo worker = require(workerId); worker.heartbeat(runningTasks); return worker;
     }
     public List<WorkerInfo> list() { return workers.values().stream().toList(); }
     public List<WorkerInfo> available(String executorType) {
+        return available(null, executorType);
+    }
+    public List<WorkerInfo> available(String tenantId, String executorType) {
         reapOffline();
-        return workers.values().stream().filter(w -> w.canRun(executorType)).toList();
+        return workers.values().stream().filter(w -> (tenantId == null || w.getTenantId().equals(tenantId) || w.getTenantId().equals("default")) && w.canRun(executorType)).toList();
+    }
+    public List<WorkerInfo> schedulable(String tenantId, String executorType) {
+        reapOffline();
+        return workers.values().stream().filter(w -> (tenantId == null || w.getTenantId().equals(tenantId) || w.getTenantId().equals("default"))
+                && (w.getStatus() == WorkerStatus.READY || w.getStatus() == WorkerStatus.BUSY) && w.getCapabilities().contains(executorType)).toList();
     }
     public void drain(String workerId) { require(workerId).drain(); }
     public void reapOffline() { workers.values().stream().filter(w -> !w.alive(heartbeatTimeoutSeconds)).forEach(w -> { w.drain(); }); }

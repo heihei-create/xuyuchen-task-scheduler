@@ -1,6 +1,7 @@
 package com.xuyuchen.scheduler.task;
 
 import org.springframework.stereotype.Component;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -8,6 +9,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
+@ConditionalOnProperty(name = "scheduler.lock", havingValue = "memory", matchIfMissing = true)
 public class InMemoryDistributedLock implements DistributedLock {
     private record Lock(String owner, Instant expiresAt) {}
     private final Map<String, Lock> locks = new ConcurrentHashMap<>();
@@ -19,6 +21,7 @@ public class InMemoryDistributedLock implements DistributedLock {
         }).owner().equals(owner);
     }
     @Override public boolean release(String key, String owner) {
-        return locks.computeIfPresent(key, (k, current) -> current.owner().equals(owner) ? null : current) == null;
+        Lock current = locks.get(key);
+        return current != null && current.owner().equals(owner) && locks.remove(key, current);
     }
 }

@@ -9,9 +9,10 @@ import java.util.UUID;
 @RequestMapping("/api/v1/state-history")
 public class TaskStateHistoryController {
     private final TaskStateHistoryService service;
-    public TaskStateHistoryController(TaskStateHistoryService service) { this.service = service; }
+    private final TaskQueryService queries;
+    public TaskStateHistoryController(TaskStateHistoryService service, TaskQueryService queries) { this.service = service; this.queries = queries; }
     @GetMapping("/{taskId}")
-    public List<TaskStateHistory> list(@PathVariable UUID taskId) { return service.list(taskId); }
+    public List<TaskStateHistory> list(@RequestHeader("X-Tenant-Id") String tenantId, @PathVariable UUID taskId) { queries.require(tenantId, taskId); return service.list(taskId); }
     @GetMapping("/{taskId}/latest")
-    public TaskStateHistory latest(@PathVariable UUID taskId) { return service.latest(taskId); }
+    public TaskStateHistory latest(@RequestHeader("X-Tenant-Id") String tenantId, @PathVariable UUID taskId) { queries.require(tenantId, taskId); return service.latest(taskId); }
 }

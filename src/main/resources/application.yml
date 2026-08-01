@@ -1,16 +1,42 @@
 spring:
   application:
     name: task-scheduler
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+  datasource:
+    url: jdbc:h2:file:./data/task-scheduler;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  sql:
+    init:
+      mode: always
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
   data:
     redis:
       host: ${REDIS_HOST:localhost}
 server:
   port: ${PORT:8081}
 scheduler:
+  persistence: jdbc
+  lock: memory
+  messaging: memory
+  worker-messaging: memory
+  auth:
+    enabled: ${SCHEDULER_AUTH_ENABLED:true}
+    tenant-keys: ${SCHEDULER_TENANT_KEYS:}
   dispatch-delay-ms: ${DISPATCH_DELAY_MS:1000}
   reaper-delay-ms: ${REAPER_DELAY_MS:5000}
+management:
+  health:
+    rabbit:
+      enabled: ${SCHEDULER_EXTERNAL_HEALTH_ENABLED:false}
+    redis:
+      enabled: ${SCHEDULER_EXTERNAL_HEALTH_ENABLED:false}
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics

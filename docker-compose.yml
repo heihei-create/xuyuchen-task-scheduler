@@ -5,9 +5,26 @@ services:
     environment:
       RABBITMQ_HOST: rabbitmq
       REDIS_HOST: redis
-    depends_on: [rabbitmq, redis]
+      SCHEDULER_PERSISTENCE: jdbc
+      SCHEDULER_LOCK: redis
+      SCHEDULER_MESSAGING: rabbit
+      SCHEDULER_WORKER_MESSAGING: rabbit
+      SCHEDULER_EXTERNAL_HEALTH_ENABLED: "true"
+      SCHEDULER_TENANT_KEYS: ${SCHEDULER_TENANT_KEYS:?set SCHEDULER_TENANT_KEYS before starting}
+      SPRING_DATASOURCE_URL: jdbc:h2:file:/app/data/task-scheduler;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    volumes: ["./data:/app/data"]
+    depends_on:
+      rabbitmq: {condition: service_healthy}
+      redis: {condition: service_healthy}
   redis:
     image: redis:7-alpine
+    volumes: ["scheduler-redis:/data"]
+    healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 5s, timeout: 3s, retries: 20}
   rabbitmq:
     image: rabbitmq:3.13-management
     ports: ["5672:5672","15672:15672"]
+    healthcheck: {test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"], interval: 10s, timeout: 5s, retries: 20}
+    volumes: ["scheduler-rabbit:/var/lib/rabbitmq"]
+volumes:
+  scheduler-redis:
+  scheduler-rabbit:

@@ -9,9 +9,10 @@ import java.util.UUID;
 @RequestMapping("/api/v1/results")
 public class TaskResultController {
     private final TaskResultService service;
-    public TaskResultController(TaskResultService service) { this.service = service; }
+    private final TaskQueryService queries;
+    public TaskResultController(TaskResultService service, TaskQueryService queries) { this.service = service; this.queries = queries; }
     @GetMapping("/{taskId}")
-    public List<TaskResult> list(@PathVariable UUID taskId) { return service.list(taskId); }
+    public List<TaskResult> list(@RequestHeader("X-Tenant-Id") String tenantId, @PathVariable UUID taskId) { queries.require(tenantId, taskId); return service.list(taskId); }
     @GetMapping("/{taskId}/latest")
-    public TaskResult latest(@PathVariable UUID taskId) { return service.latest(taskId); }
+    public TaskResult latest(@RequestHeader("X-Tenant-Id") String tenantId, @PathVariable UUID taskId) { queries.require(tenantId, taskId); return service.latest(taskId); }
 }
