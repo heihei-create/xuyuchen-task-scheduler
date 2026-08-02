@@ -15,6 +15,7 @@ public class TenantQuotaService {
     }
     public TenantQuota require(String tenantId) { return quotas.computeIfAbsent(tenantId, id -> new TenantQuota(id, 3, 1000)); }
     public boolean reserveSubmission(String tenantId) { return require(tenantId).reserveSubmission(); }
+    public void rollbackSubmission(String tenantId) { require(tenantId).rollbackSubmission(); }
     public boolean acquire(String tenantId) { return require(tenantId).tryAcquire(); }
     public void release(String tenantId) { require(tenantId).release(); }
 }

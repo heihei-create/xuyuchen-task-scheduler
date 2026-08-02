@@ -12,6 +12,7 @@ A Java 17 / Spring Boot service for submitting and tracking engineering compute 
 - REST endpoints for create, list, inspect, start, finish and cancel
 - Durable H2 task state by default, with Redis locking and RabbitMQ delivery adapters in Compose
 - Lease recovery is based on persisted expiry, so a scheduler restart cannot strand a running slot
+- H2-backed audit and task state history for transition traceability across process restarts
 
 ## Run locally
 

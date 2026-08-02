@@ -26,6 +26,7 @@ public class TenantQuota {
             return true;
         }
     }
+    public void rollbackSubmission() { dailySubmitted.updateAndGet(value -> Math.max(0, value - 1)); }
     public boolean tryAcquire() {
         while (true) {
             int current = running.get();

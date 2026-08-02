@@ -16,10 +16,15 @@ public class WorkerRegistry {
         return register("default", workerId, host, capabilities);
     }
     public WorkerInfo register(String tenantId, String workerId, String host, Set<String> capabilities) {
-        workers.values().stream().filter(existing -> existing.getWorkerId().equals(workerId) && !existing.getTenantId().equals(tenantId)).findAny()
-                .ifPresent(existing -> { throw new IllegalStateException("worker id is already registered by another tenant"); });
-        WorkerInfo worker = new WorkerInfo(tenantId, workerId, host, capabilities);
-        worker.ready(); workers.put(workerId, worker); return worker;
+        if (tenantId == null || tenantId.isBlank() || workerId == null || workerId.isBlank()) throw new IllegalArgumentException("tenant and worker are required");
+        if (capabilities == null || capabilities.isEmpty()) throw new IllegalArgumentException("worker capabilities are required");
+        final WorkerInfo[] registered = new WorkerInfo[1];
+        workers.compute(workerId, (id, existing) -> {
+            if (existing != null && !existing.getTenantId().equals(tenantId)) throw new IllegalStateException("worker id is already registered by another tenant");
+            WorkerInfo worker = new WorkerInfo(tenantId, workerId, host, capabilities);
+            worker.ready(); registered[0] = worker; return worker;
+        });
+        return registered[0];
     }
     public WorkerInfo require(String workerId) {
         WorkerInfo worker = workers.get(workerId);
